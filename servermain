@@ -1,0 +1,297 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <math.h>
+#include "calcLib.h" // Include the calcLib library header file
+
+#define BACKLOG 5
+#define TIMEOUT_SECONDS 100
+// 全局变量，用于跟踪连接的客户端数量
+volatile int client_count = 0;
+// 定义颜色标记
+#define COLOR_ORANGE "\033[33m"  // 橙色
+#define COLOR_RESET "\033[0m"    // 复位
+typedef struct {
+    int fd;
+    struct sockaddr_storage address;
+} client_t;
+
+// 计算两个数的结果
+double calculateResult(const char *operation, double value1, double value2) {
+    if (strcmp(operation, "add") == 0) {
+        return value1 + value2;
+    } else if (strcmp(operation, "sub") == 0) {
+        return value1 - value2;
+    } else if (strcmp(operation, "mul") == 0) {
+        return value1 * value2;
+    } else if (strcmp(operation, "div") == 0) {
+        // 避免除以零
+        if (value2 != 0) {
+            return static_cast<int>(value1 / value2);
+        } else {
+            // 如果除数为零，则返回一个特殊值（例如，NaN）
+            return NAN;
+        }
+    } else if (strcmp(operation, "fadd") == 0) {
+        return value1 + value2;
+    } else if (strcmp(operation, "fsub") == 0) {
+        return value1 - value2;
+    } else if (strcmp(operation, "fmul") == 0) {
+        return value1 * value2;
+    } else if (strcmp(operation, "fdiv") == 0) {
+        // 避免除以零
+        if (value2 != 0) {
+            return value1 / value2;
+        } else {
+            // 如果除数为零，则返回一个特殊值（例如，NaN）
+            return NAN;
+        }
+    } else {
+        // 未知的操作符
+        return NAN;
+    }
+}
+
+// 处理客户端连接的函数
+void *handle_client(void *arg) {
+    client_t *client = (client_t *)arg;
+    char client_ip[INET6_ADDRSTRLEN];
+    inet_ntop(client->address.ss_family, &((struct sockaddr_in *)&client->address)->sin_addr, client_ip, sizeof(client_ip));
+    // 输出连接的客户端id
+    printf("Client connected: %s\n", client_ip);
+
+    // 设置客户端连接的超时时间
+    struct timeval timeout;
+    timeout.tv_sec = TIMEOUT_SECONDS;
+    timeout.tv_usec = 0;
+    setsockopt(client->fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
+
+    // 发送服务器支持的协议字符串
+    const char *protocol_msg ="TEXT TCP 1.0\n";
+    int bytes_sent = send(client->fd, protocol_msg, strlen(protocol_msg), 0);
+    if (bytes_sent == -1) {
+        perror("send");
+        close(client->fd);
+        free(client);
+        return NULL;
+    }
+
+    char buffer[1024];
+    int bytes_received = recv(client->fd, buffer, sizeof(buffer), 0);
+    if (bytes_received == -1) {
+        perror("recv");
+        close(client->fd);
+        free(client);
+        return NULL;
+    } else if (bytes_received == 0) {
+        printf("Client disconnected.\n");
+        // 关闭客户端连接
+        close(client->fd);
+        free(client);
+        return NULL;
+    } else {
+        // 处理客户端请求
+        if (bytes_received >= 3 && (strcmp(buffer, COLOR_ORANGE "OK\n" COLOR_RESET) == 0||strcmp(buffer,"OK\n")==0)) {
+
+            // 客户端接受协议，生成随机计算任务并发送给客户端
+            char *operation = randomType(); // 随机选择操作符
+            double value1, value2;
+            char assignment_msg[1024];
+            if (strcmp(operation, "add") == 0 || strcmp(operation, "div") == 0 || strcmp(operation, "mul") == 0 || strcmp(operation, "sub") == 0) {
+                // 生成两个随机整数
+                value1 = randomInt();
+                value2 = randomInt();
+                snprintf(assignment_msg, sizeof(assignment_msg), "%s %d %d\n", operation, (int)value1, (int)value2);
+            } else if (strcmp(operation, "fadd") == 0 || strcmp(operation, "fdiv") == 0 || strcmp(operation, "fmul") == 0 || strcmp(operation, "fsub") == 0) {
+                // 生成两个随机浮点数
+                value1 = randomFloat();
+                value2 = randomFloat();
+                snprintf(assignment_msg, sizeof(assignment_msg), "%s %8.8g %8.8g\n", operation, value1, value2);
+            }
+            bytes_sent = send(client->fd, assignment_msg, strlen(assignment_msg), 0);
+            if (bytes_sent == -1) {
+                perror("send");
+                close(client->fd);
+                free(client);
+                return NULL;
+            }
+
+            // 接收客户端的计算结果
+            char result_buffer[1024];
+            bytes_received = recv(client->fd, result_buffer, sizeof(result_buffer), 0);
+            if (bytes_received == -1) {
+                perror("recv");
+                close(client->fd);
+                free(client);
+                return NULL;
+            } else if (bytes_received == 0) {
+                printf("Client disconnected.\n");
+                // 关闭客户端连接
+                close(client->fd);
+                free(client);
+                return NULL;
+            } else {
+                // 解析客户端发送的消息
+                double client_result;
+                int parsed;
+                if (strstr(result_buffer, "\033[33m") != NULL) {
+                    // 如果消息中包含颜色设置，则解析
+                    parsed = sscanf(result_buffer, "\033[33m%lf", &client_result);
+                } else {
+                    // 如果消息中没有颜色设置，则直接解析
+                    parsed = sscanf(result_buffer, "%lf", &client_result);
+                }
+                if (parsed != 1) {
+                    // 解析失败
+                    const char *response = "Error parsing client result.\n";
+                    bytes_sent = send(client->fd, response, strlen(response), 0);
+                    if (bytes_sent == -1) {
+                        perror("send");
+                    }
+                    return NULL;
+                }
+                // 计算服务器端的结果
+                double server_result = calculateResult(operation, value1, value2);
+
+                // 比较客户端和服务器端的结果
+                double diff = fabs(client_result - server_result);
+                if (diff < 0.0001) {
+                    // 结果匹配
+                    const char *response = "OK\n";
+                    bytes_sent = send(client->fd, response, strlen(response), 0);
+                    if (bytes_sent == -1) {
+                        perror("send");
+                    }
+                } else {
+                    // 结果不匹配
+                    const char *response = "ERROR\n";
+                    bytes_sent = send(client->fd, response, strlen(response), 0);
+                    if (bytes_sent == -1) {
+                        perror("send");
+                    }
+                }
+            }
+        } else {
+            const char *response = "Server received unexpected message from client. Closing connection.\n";
+            bytes_sent = send(client->fd, response, strlen(response), 0);
+            if (bytes_sent == -1) {
+                perror("send");
+            }
+        }
+    }
+
+    // 关闭客户端连接
+    close(client->fd);
+    free(client);
+    client_count--;
+    pthread_exit(NULL);
+    return NULL;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <hostname>:<port>\n", argv[0]);
+        exit(1);
+    }
+    
+    // 解析主机名和端口号
+    char *hostname_port = argv[1];
+    char *hostname = strtok(hostname_port, ":");
+    char *port = strtok(NULL, ":");
+    if (hostname == NULL || port == NULL) {
+        fprintf(stderr, "Invalid address. Usage: %s <hostname>:<port>\n", argv[0]);
+        exit(1);
+    }
+
+    // 初始化calcLib库
+    int init_result = initCalcLib();
+    if (init_result != 0) {
+        fprintf(stderr, "Failed to initialize calcLib library\n");
+        return 1;
+    }
+
+    // 获取地址信息
+    struct addrinfo hints, *servinfo;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    int status = getaddrinfo(hostname, port, &hints, &servinfo);
+    if (status != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+        return 1;
+    }
+
+    // 创建服务器socket
+    int server_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    if (server_fd == -1) {
+        perror("socket");
+        return 1;
+    }
+
+    // 绑定服务器socket到地址和端口
+    if (bind(server_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+        perror("bind");
+        close(server_fd);
+        return 1;
+    }
+
+    // 监听客户端连接
+    if (listen(server_fd, BACKLOG) == -1) {
+        perror("listen");
+        close(server_fd);
+        return 1;
+    }
+
+    printf("Server is running and listening on %s:%s...\n", hostname, port);
+
+    while (1) {
+        if (client_count >= BACKLOG) {
+            printf("Waiting queue is full. Rejecting new connections.\n");
+            sleep(1); // 等待一段时间以避免过快的连接请求
+            continue;
+        }
+        // 接受客户端连接
+        struct sockaddr_storage client_address;
+        socklen_t client_address_len = sizeof(client_address);
+        int client_fd = accept(server_fd, (struct sockaddr *)&client_address, &client_address_len);
+        if (client_fd == -1) {
+            perror("accept");
+            continue;
+        }
+        client_count++;
+        // 创建线程处理客户端连接
+        client_t *client = (client_t *)malloc(sizeof(client_t));
+        if (client == NULL) {
+            perror("malloc");
+            close(client_fd);
+            continue;
+        }
+        client->fd = client_fd;
+        memcpy(&client->address, &client_address, sizeof(client_address));
+        
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, handle_client, client) != 0) {
+            perror("pthread_create");
+            close(client_fd);
+            free(client);
+            continue;
+        } else {
+            printf("Thread created successfully. Client ID: %d\n", client_count);
+        }
+    }
+
+    // 释放地址信息内存
+    freeaddrinfo(servinfo);
+
+    // 关闭服务器socket
+    close(server_fd);
+
+    return 0;
+}
