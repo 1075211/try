@@ -33,6 +33,3 @@ libcalc: calcLib.o
 clean:
 	rm *.o *.a test server client
 
-
-
-
