@@ -11,217 +11,283 @@
 
 // Enable if you want debugging to be printed, see examble below.
 // Alternative, pass CFLAGS=-DDEBUG to make, make CFLAGS=-DDEBUG
-//#define DEBUG
-
+// #define DEBUG
 
 // Included to get the support library
 #include "calcLib.h"
-//Function to recieve a message from the server
-void recieveMessage(int &socket_desc, char* server_message, unsigned int msg_size){
+// Function to recieve a message from the server
+void recieveMessage(int &socket_desc, char *server_message, unsigned int msg_size)
+{
 
-  //Clears the message array before recieving the server msg.
-  //Because for some reason the function doesnt do it by itself
+  // Clears the message array before recieving the server msg.
+  // Because for some reason the function doesnt do it by itself
   memset(server_message, 0, msg_size);
-  if(recv(socket_desc, server_message, msg_size, 0) < 0){
-  	#ifdef DEBUG
-  	printf("Error receiving message\n");
-  	#endif
-  	exit(-1);
+  if (recv(socket_desc, server_message, msg_size, 0) < 0)
+  {
+#ifdef DEBUG
+    printf("Error receiving message\n");
+#endif
+    exit(-1);
   }
-  else 
-    printf("%s",server_message);
-} 
-void sendMessage(int &socket_desc, char* client_message, unsigned int msg_size){
-
-  //Sends message to client, clearing the array at the end to not interfere with
-  //the messages we put in before calling the function
-  if(send(socket_desc, client_message, msg_size, 0) < 0){
-	#ifdef DEBUG
-  	printf("Unable to send message\n");
-  	#endif 
-  	exit(-1);
-  }
-  else printf("%s",client_message);
- 
+  else
+    printf("%s", server_message);
 }
-void calculateMessage(char* server_message, int &socket_desc) {
-    int i1, i2, iresult = 0;
-    float f1, f2, fresult = 0.0f;
-    char *operation, *grab1, *grab2;
-    char *saveptr; // For strtok_r
-    
-    if (server_message[0] == 'f') {
-        operation = strtok_r(server_message, " ", &saveptr);
-        grab1 = strtok_r(NULL, " ", &saveptr);
-        grab2 = strtok_r(NULL, " ", &saveptr);
-        f1 = atof(grab1); 
-        f2 = atof(grab2);
-        
-        if (strcmp(operation, "fadd") == 0) {
-            fresult = f1 + f2;
-        } else if (strcmp(operation, "fsub") == 0) {
-            fresult = f1 - f2;
-        } else if (strcmp(operation, "fmul") == 0) {
-            fresult = f1 * f2;
-        } else if (strcmp(operation, "fdiv") == 0) {
-            fresult = f1 / f2;
-        }
-        
-        char* str = (char*)malloc(32); // Adjust the size as needed
-		// Adding ANSI escape sequence for orange color (33m)
-		snprintf(str, 64, "\033[33m%8.8g \n\033[0m", fresult);
-        sendMessage(socket_desc, str, strlen(str));
-        free(str); // Free the allocated memory
-        return;
-        
-    } else {
-        operation = strtok_r(server_message, " ", &saveptr);
-        grab1 = strtok_r(NULL, " ", &saveptr);
-        grab2 = strtok_r(NULL, " ", &saveptr);
-        i1 = atoi(grab1); 
-        i2 = atoi(grab2);
-        
-        if (strcmp(operation, "add") == 0) {
-            iresult = i1 + i2;
-        } else if (strcmp(operation, "sub") == 0) {
-            iresult = i1 - i2;
-        } else if (strcmp(operation, "mul") == 0) {
-            iresult = i1 * i2;
-        } else if (strcmp(operation, "div") == 0) {
-            iresult = i1 / i2;
-        }
-        
-        char* strResult = (char*)malloc(32); // Adjust the size as needed
-        // Adding ANSI escape sequence for orange color (33m)
-		snprintf(strResult, 64, "\033[33m%d \n\033[0m", iresult);
-        sendMessage(socket_desc, strResult, strlen(strResult));
-        free(strResult); // Free the allocated memory
-        return;
+void sendMessage(int &socket_desc, char *client_message, unsigned int msg_size)
+{
+
+  // Sends message to client, clearing the array at the end to not interfere with
+  // the messages we put in before calling the function
+  if (send(socket_desc, client_message, msg_size, 0) < 0)
+  {
+#ifdef DEBUG
+    printf("Unable to send message\n");
+#endif
+    exit(-1);
+  }
+  else
+    printf("%s", client_message);
+}
+void calculateMessage(char *server_message, int &socket_desc)
+{
+  int i1, i2, iresult = 0;
+  float f1, f2, fresult = 0.0f;
+  char *operation, *grab1, *grab2;
+  char *saveptr; // For strtok_r
+
+  if (server_message[0] == 'f')
+  {
+    operation = strtok_r(server_message, " ", &saveptr);
+    grab1 = strtok_r(NULL, " ", &saveptr);
+    grab2 = strtok_r(NULL, " ", &saveptr);
+    f1 = atof(grab1);
+    f2 = atof(grab2);
+
+    if (strcmp(operation, "fadd") == 0)
+    {
+      fresult = f1 + f2;
     }
-}
+    else if (strcmp(operation, "fsub") == 0)
+    {
+      fresult = f1 - f2;
+    }
+    else if (strcmp(operation, "fmul") == 0)
+    {
+      fresult = f1 * f2;
+    }
+    else if (strcmp(operation, "fdiv") == 0)
+    {
+      fresult = f1 / f2;
+    }
 
+    char *str = (char *)malloc(32); // Adjust the size as needed
+    // Adding ANSI escape sequence for orange color (33m)
+    snprintf(str, 64, "\033[33m%8.8g \n\033[0m", fresult);
+    sendMessage(socket_desc, str, strlen(str));
+    free(str); // Free the allocated memory
+    return;
+  }
+  else
+  {
+    operation = strtok_r(server_message, " ", &saveptr);
+    grab1 = strtok_r(NULL, " ", &saveptr);
+    grab2 = strtok_r(NULL, " ", &saveptr);
+    i1 = atoi(grab1);
+    i2 = atoi(grab2);
+
+    if (strcmp(operation, "add") == 0)
+    {
+      iresult = i1 + i2;
+    }
+    else if (strcmp(operation, "sub") == 0)
+    {
+      iresult = i1 - i2;
+    }
+    else if (strcmp(operation, "mul") == 0)
+    {
+      iresult = i1 * i2;
+    }
+    else if (strcmp(operation, "div") == 0)
+    {
+      iresult = i1 / i2;
+    }
+
+    char *strResult = (char *)malloc(32); // Adjust the size as needed
+                                          // Adding ANSI escape sequence for orange color (33m)
+    snprintf(strResult, 64, "\033[33m%d \n\033[0m", iresult);
+    sendMessage(socket_desc, strResult, strlen(strResult));
+    free(strResult); // Free the allocated memory
+    return;
+  }
+}
 
 int CAP = 2000;
-int main(int argc, char *argv[]){
-
-
-	//Variables
-	char* splits[CAP];
-  char* p = strtok(argv[1], ":");
-  int delimCounter = 0;
-  char *Desthost;
-  char *Destport;
+int main(int argc, char *argv[])
+{
+  if (argc < 2)
+  {
+    fprintf(stderr, "Usage: %s <hostname>:<port>\n", argv[0]);
+    exit(1);
+  }
+  // Variables
+  char *p = argv[1];
+  int colonCount = 0;
   int port;
-	char server_message[CAP];
-  //Get argv
-  while(p != NULL){
-  	//Look for the amount of ":" in argv to determine if ipv4 or ipv6
-  	splits[delimCounter++] = p;
-  	p = strtok(NULL, ":");
-  }
-  Destport = splits[--delimCounter];
-  Desthost = splits[0];
-  for(int i = 1;i<delimCounter;i++){
-  	
-  	snprintf(Desthost,sizeof(Desthost), "%s:%s",Desthost, splits[i]);
-  }
-  port=atoi(Destport);
-  printf("Host %s and port %d.\n",Desthost,port);
-	
-	//Getaddrinfo
-	struct addrinfo hints, *serverinfo = 0;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	
-	if(getaddrinfo(Desthost, Destport, &hints, &serverinfo) < 0){
-		printf("Getaddrinfo error: %s\n", strerror(errno)); 
-		exit(0);
-	} //else printf("Getaddrinfo success\n");
-  
-  //Create TCP socket
+  char server_message[CAP];
+
+    // 统计冒号的数量
+    while (*p)
+    {
+        if (*p == ':')
+        {
+            colonCount++;
+        }
+        p++;
+    }
+    char *Desthost;
+    char *Destport;
+    // 根据冒号的数量判断是IPv4还是IPv6
+    if (colonCount == 1)
+    { // IPv4
+        char delim[] = ":";
+        Desthost = strtok(argv[1], delim); // 提取IP地址
+        Destport = strtok(NULL, delim);    // 提取端口号
+        if (Destport == NULL)
+        {
+            printf("Invalid format.\n");
+            return 1;
+        }
+        // 如果主机名是 "localhost"，将其解析为 "127.0.0.1"
+        if (strcmp(Desthost, "localhost") == 0)
+        {
+            char local[] = "127.0.0.1";
+            Desthost = local;
+        }
+        port = atoi(Destport); // 将端口号字符串转换为整数
+        printf("IPv4 Address: %s Port: %d\n", Desthost,port);
+    }
+    else if (colonCount > 1)
+    {                                           // IPv6
+        Desthost = argv[1];               // IPv6地址
+        Destport = strrchr(argv[1], ':'); // 查找最后一个冒号，即端口号的位置
+        if (Destport == NULL || Destport == argv[1])
+        {
+            printf("Invalid format.\n");
+            return 1;
+        }
+        *Destport = '\0';          // 将冒号替换为字符串结束符
+        Destport++;                // 移动指针到端口号的起始位置
+        port = atoi(Destport); // 将端口号字符串转换为整数
+        printf("IPv6 Address: %s Port: %d\n", Desthost,port);
+    }
+    else
+    {
+        printf("Invalid format.\n");
+        return 1;
+    }
+
+  // Getaddrinfo
+  struct addrinfo hints, *serverinfo = 0;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  if (getaddrinfo(Desthost, Destport, &hints, &serverinfo) < 0)
+  {
+    printf("Getaddrinfo error: %s\n", strerror(errno));
+    exit(0);
+  } // else printf("Getaddrinfo success\n");
+
+  // Create TCP socket
   int socket_desc;
   struct sockaddr_in server_addr;
   socket_desc = socket(serverinfo->ai_family, serverinfo->ai_socktype, serverinfo->ai_protocol);
-  
-  if(socket_desc < 0){
-  	#ifdef DEBUG
-  	printf("Unable to create socket\n");
-  	#endif
-  	return -1;
+
+  if (socket_desc < 0)
+  {
+#ifdef DEBUG
+    printf("Unable to create socket\n");
+#endif
+    return -1;
   }
-  #ifdef DEBUG
-  else printf("Socket Created\n");
-  #endif
-  
-  
-#ifdef DEBUG 
-  printf("Host %s, and Port %d.\n",Desthost,port);
+#ifdef DEBUG
+  else
+    printf("Socket Created\n");
 #endif
 
-  //Create Socket Structure
+#ifdef DEBUG
+  printf("Host %s, and Port %d.\n", Desthost, port);
+#endif
+
+  // Create Socket Structure
   server_addr.sin_family = AF_INET;
   server_addr.sin_port = htons(port);
   server_addr.sin_addr.s_addr = inet_addr(Desthost);
   int error;
-  
-  //Establish Connection
-  error = connect(socket_desc, serverinfo->ai_addr, serverinfo->ai_addrlen);
-  if(error < 0){
-  	#ifdef DEBUG
-  	printf("Unable to connect\n");
-  	printf("Error: %d \n", errno);
-  	#endif
-  	return -1;
-  }
-  #ifdef DEBUG
-  else printf("Connected\n");
-  #endif
-  
-  //Recieve message from server
-  recieveMessage(socket_desc, server_message, sizeof(server_message));
-  
-  //Compare strings to verify version
 
-  if(strcmp(server_message,"TEXT TCP 1.0\n") == 0){
-  	#ifdef DEBUG
-  	printf("Same\n");
-  	#endif 
-	char buffer[20];
-	strcpy(buffer, "OK\n");
-	// Adding ANSI escape sequence for orange color (33m)
-	char str[20];
-	snprintf(str, 20, "\033[33m%s\033[0m", buffer);
-	// Send back the OK
-	sendMessage(socket_desc, str, strlen(str));
+  // Establish Connection
+  error = connect(socket_desc, serverinfo->ai_addr, serverinfo->ai_addrlen);
+  if (error < 0)
+  {
+#ifdef DEBUG
+    printf("Unable to connect\n");
+    printf("Error: %d \n", errno);
+#endif
+    return -1;
   }
-  else{
-	  printf("Closing connection\n");
-	  close(socket_desc);
-	  return -1;
+#ifdef DEBUG
+  else
+    printf("Connected\n");
+#endif
+
+  // Recieve message from server
+  recieveMessage(socket_desc, server_message, sizeof(server_message));
+
+  // Compare strings to verify version
+
+  if (strcmp(server_message, "TEXT TCP 1.0\n") == 0)
+  {
+#ifdef DEBUG
+    printf("Same\n");
+#endif
+    char buffer[20];
+    strcpy(buffer, "OK\n");
+    // Adding ANSI escape sequence for orange color (33m)
+    char str[20];
+    snprintf(str, 20, "\033[33m%s\033[0m", buffer);
+    // Send back the OK
+    sendMessage(socket_desc, str, strlen(str));
+  }
+  else
+  {
+    printf("Closing connection\n");
+    close(socket_desc);
+    return -1;
   }
   recieveMessage(socket_desc, server_message, sizeof(server_message));
-  
-  if(strcmp(server_message, "ERROR TO\n") == 0){
-	  printf("We got TO'ed. Closing connection\n");
-	  close(socket_desc);
-	  return -1;
+
+  if (strcmp(server_message, "ERROR TO\n") == 0)
+  {
+    printf("We got TO'ed. Closing connection\n");
+    close(socket_desc);
+    return -1;
   }
-  //Translate Message
+  // Translate Message
   calculateMessage(server_message, socket_desc);
-  
-  //Send answer to server
-  //sendMessage(socket_desc, client_message, sizeof(client_message));
-  
-  //Recieve the final Message
+
+  // Send answer to server
+  // sendMessage(socket_desc, client_message, sizeof(client_message));
+
+  // Recieve the final Message
   recieveMessage(socket_desc, server_message, sizeof(server_message));
-  if(strcmp(server_message, "ERROR TO\n") == 0){
-	  printf("We got TO'ed. Closing connection\n");
-	  close(socket_desc);
-	  return -1;
+  if (strcmp(server_message, "ERROR TO\n") == 0)
+  {
+    printf("We got TO'ed. Closing connection\n");
+    close(socket_desc);
+    return -1;
   }
-  //Close socket and quit program
-  //TODO
+  // Close socket and quit program
+  // TODO
   close(socket_desc);
   return 0;
 }
+
